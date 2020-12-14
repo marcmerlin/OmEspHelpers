@@ -26,6 +26,7 @@
 #define __OmWebRequest__
 
 #include "OmUtil.h"
+#include <stdlib.h> // malloc
 #include <vector>
 
 static void inplaceRequestDecode(char *r)
@@ -52,11 +53,11 @@ static void inplaceRequestDecode(char *r)
 /*! Doesn't handle hex coding or quotes and stuff. */
 class OmWebRequest
 {
-    static const int kRequestLengthMax = 320;
+    static const int kRequestLengthMax = 2000;
 public:
     const char *path;
     std::vector<char *> query; // vector of alternating keys & values.
-    char request[kRequestLengthMax + 1];
+    char *request;
     
     OmWebRequest()
     {
@@ -64,11 +65,20 @@ public:
         this->query.clear();
     }
 
+    ~OmWebRequest()
+    {
+	delete(request);
+    }
+
     void init(const char *request)
     {
         this->path = "";
         this->query.clear();
         int rIx = 0;
+
+	while ((this->request = (char *) malloc(kRequestLengthMax + 1)) == NULL) {
+	    printf("Can't malloc OmWebRequest.h::kRequestLengthMax\n");
+	}
         for(int ix = 0; ix <= kRequestLengthMax; ix++)
         {
             char c = request[rIx++];

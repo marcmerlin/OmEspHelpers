@@ -77,6 +77,7 @@ public:
 
     void printf(const char *format, ...)
     {
+	return;
         if(!this->doSerial)  // serial disabled?
             return;
         
