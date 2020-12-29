@@ -185,7 +185,7 @@ public:
         w.endElement(); // span
         w.beginElement("input", "type", "range");
         w.addAttributeF("value", "%d", this->value);
-        w.addAttribute("style", "width: 330px");
+        w.addAttribute("style", "width: 430px");
         w.addAttributeF("id", "%s_%s", inPage->id, this->id);
         w.addAttributeF("onchange", "sliderInput(this,'%s', '%s')", inPage->id, this->id);
         w.addAttributeF("oninput", "sliderInput(this,'%s','%s')", inPage->id, this->id);
@@ -1060,7 +1060,7 @@ void OmWebPages::renderStyle(OmXmlWriter &w, int bgColor)
                  )JS"
     );
 
-    w.addContentF(".box1,.box2,.button{font-size:30px; width:420px ; margin:10px; "
+    w.addContentF(".box1,.box2,.button{font-size:30px; width:540px ; margin:10px; "
                  "padding:10px ; background:%s;"
                  "border-top-left-radius:15px;"
                  "border-bottom-right-radius:15px;"
@@ -1069,7 +1069,7 @@ void OmWebPages::renderStyle(OmXmlWriter &w, int bgColor)
                  , colorItem
                  );
     // Not sure why I need to add more width to the button, to make it match
-    w.addContent(".button{border:2px solid black;width:440px;display:block}\n");
+    w.addContent(".button{border:2px solid black;width:560px;display:block}\n");
     w.addContent(".box2{display:inline-block;"
                  "font-size:22px; padding:7px;"
                  "width:auto;overflow:hidden ; "
