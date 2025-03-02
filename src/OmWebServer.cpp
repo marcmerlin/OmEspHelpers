@@ -551,6 +551,10 @@ int OmWebServer::tick()
                 WiFi.mode(WIFI_AP);
                 WiFi.softAP(this->p->accessPointSsid.c_str(), this->p->accessPointPassword.length() ? this->p->accessPointPassword.c_str() : 0);
 #ifdef ARDUINO_ARCH_ESP32
+		#ifndef SYSTEM_EVENT_AP_STACONNECTED
+		#define SYSTEM_EVENT_AP_STACONNECTED ARDUINO_EVENT_WIFI_AP_STACONNECTED
+		#define SYSTEM_EVENT_AP_STADISCONNECTED ARDUINO_EVENT_WIFI_AP_STADISCONNECTED
+		#endif
                 WiFi.onEvent(WiFiStationConnected, SYSTEM_EVENT_AP_STACONNECTED);
                 WiFi.onEvent(WiFiStationDisconnected, SYSTEM_EVENT_AP_STADISCONNECTED);
 #endif
