@@ -124,10 +124,12 @@ public:
     /*! No argument constructor */
     OmWebPages();
 
+    ~OmWebPages();
+
     /*!
      @abstract say p.setBuildDateAndTime(__DATE__, __TIME__) so the info web page can display it.
      */
-    void setBuildDateAndTime(const char *date, const char *time);
+    void setBuildDateAndTime(const char *date, const char *time, const char *file = NULL);
     
     // +----------------------------------
     // | Setting up your pages
@@ -137,30 +139,32 @@ public:
     void beginPage(const char *pageName);
 
     /*! @abstract Add a link on the current page that goes to another page. Also can call an action proc. */
-    void addPageLink(const char *pageLink, OmWebActionProc proc = 0, int ref1 = 0, void *ref2 = 0);
+    void addPageLink(const char *pageLink, OmWebActionProc proc = NULL, int ref1 = 0, void *ref2 = 0);
 
     /*! @abstract Add a button on the current page. Calls the action proc with value 1 for press, 0 for release. */
-    OmWebPageItem *addButton(const char *buttonName, OmWebActionProc proc = 0, int ref1 = 0, void *ref2 = 0);
+    OmWebPageItem *addButton(const char *buttonName, OmWebActionProc proc = NULL, int ref1 = 0, void *ref2 = 0);
 
-    /*! @abstract Add a button on the current page, which fires a page redirect after the button-up. */
-    OmWebPageItem *addButtonWithLink(const char *buttonName, const char *url, OmWebActionProc proc = 0, int ref1 = 0, void *ref2 = 0);
+    /*! @abstract Add a button on the current page, which fires a page redirect after the button-up.
+     The OmWebActionProc would often be NULL here, if the button's main purpose is to go to another web page.
+     */
+    OmWebPageItem *addButtonWithLink(const char *buttonName, const char *url, OmWebActionProc proc = NULL, int ref1 = 0, void *ref2 = 0);
     
     /*! @abstract Add a slider control on the current page. The range is 0 to 100, and calls your param proc when changed. */
-    OmWebPageItem *addSlider(const char *sliderName, OmWebActionProc proc = 0, int value = 0, int ref1 = 0, void *ref2 = 0);
+    OmWebPageItem *addSlider(const char *sliderName, OmWebActionProc proc = NULL, int value = 0, int ref1 = 0, void *ref2 = 0);
 
     /*! @abstract Add a slider control on the current page, with a specific range. */
-    OmWebPageItem *addSlider(int rangeLow, int rangeHigh, const char *sliderName, OmWebActionProc proc = 0, int value = 0, int ref1 = 0, void *ref2 = 0);
+    OmWebPageItem *addSlider(int rangeLow, int rangeHigh, const char *sliderName, OmWebActionProc proc = NULL, int value = 0, int ref1 = 0, void *ref2 = 0);
 
     /*! @abstract Add a time-input */
-    OmWebPageItem *addTime(const char *itemName, OmWebActionProc proc = 0, int value = 0, int ref1 = 0, void *ref2 = 0);
+    OmWebPageItem *addTime(const char *itemName, OmWebActionProc proc = NULL, int value = 0, int ref1 = 0, void *ref2 = 0);
 
     OmWebPageItem *addInputText(const char *itemName, OmWebActionProc proc = 0, String strvalue = "", int ref1 = 0, void *ref2 = 0);
 
     /*! @abstract Add a color-input, int value is 0xRRGGBB */
-    OmWebPageItem *addColor(const char *itemName, OmWebActionProc proc = 0, int value = 0, int ref1 = 0, void *ref2 = 0);
+    OmWebPageItem *addColor(const char *itemName, OmWebActionProc proc = NULL, int value = 0, int ref1 = 0, void *ref2 = 0);
 
     /*! @abstract Begin a menu select control. Choices are added with addSelectOption() */
-    OmWebPageItem *addSelect(const char *itemName, OmWebActionProc proc = 0, int value = 0, int ref1 = 0, void *ref2 = 0);
+    OmWebPageItem *addSelect(const char *itemName, OmWebActionProc proc = NULL, int value = 0, int ref1 = 0, void *ref2 = 0);
     /*! @abstract Add one selectable item, and its integer value if selected */
     void addSelectOption(const char *optionName, int optionValue);
 
@@ -168,14 +172,16 @@ public:
      If checkboxName is NULL, then the first checkbox will be added by addCheckboxX
      The int value of the control is binary, where the nth checkbox adds 2^(n-1) to the value
      */
-    OmWebPageItem *addCheckbox(const char *itemName, const char *checkboxName, OmWebActionProc proc = 0, int value = 0, int ref1 = 0, void *ref2 = 0);
+    OmWebPageItem *addCheckbox(const char *itemName, const char *checkboxName, OmWebActionProc proc = NULL, int value = 0, int ref1 = 0, void *ref2 = 0);
     /*! @abstract Add additional checkboxes */
     void addCheckboxX(const char *checkboxName, int value = 0); // additional checkboxes.
 
 
-    /*! @abstract Add a block of custom HTML to the page. Your proc is called each time the page is requested. */
+    /*! @abstract Add a block of custom dynamic HTML to the page. Your proc is called each time the page is requested. */
     void addHtml(HtmlProc proc, int ref1 = 0, void *ref2 = 0);
 
+    /*! @abstract Add a string of static prebuilt HTML. Included in web page unchecked, you're on your own! */
+    void addStaticHtml(String staticHtml);
 
     /*! @abstract By default, any header proc is used on every page. Disable for current page here. */
     void allowHeader(bool allowHeader);
@@ -291,8 +297,8 @@ private:
     PageItem *currentSelect = 0; // addSelectOption applies to the most recently begun select.
     PageItem *currentCheckboxes = 0; // addCheckboxX adds another checkbox here
     
-    HtmlProc headerProc = 0;
-    HtmlProc footerProc = 0;
+    HtmlProc headerProc = NULL;
+    HtmlProc footerProc = NULL;
     
     OmXmlWriter *wp = 0; // writer pointer during callbacks.
 
@@ -300,6 +306,7 @@ private:
 
     const char *__date__;
     const char *__time__;
+    const char *__file__;
 public:
     OmRequestInfo *ri = 0; // request metadate during callbacks
 };

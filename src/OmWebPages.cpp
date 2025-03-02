@@ -40,8 +40,15 @@ public:
     virtual bool doAction(Page *fromPage) = 0;
     void setValue(int value) { this->value = value; }
 
+    virtual void renderStatusey(OmXmlWriter &w) {};
+
     OmWebPageItem item;
     PageItem() : item(this)
+    {
+        return;
+    }
+
+    virtual ~PageItem()
     {
         return;
     }
@@ -87,6 +94,21 @@ void OmWebPageItem::setValue(int value)
 class Page
 {
 public:
+    ~Page()
+    {
+        this->clearPage();
+    }
+
+    void clearPage()
+    {
+        for(PageItem *item : this->items)
+        {
+            if(item)
+                delete item;
+        }
+        this->items.clear();
+    }
+
     const char *name = "";
     char id[6]; // simple mechanical id like p0 or p23.
     std::vector<PageItem *> items;
@@ -101,9 +123,6 @@ public:
         this->items.push_back(item);
     }
 };
-
-
-
 
 class PageLink : public PageItem
 {
@@ -166,7 +185,7 @@ public:
         w.endElement(); // span
         w.beginElement("input", "type", "range");
         w.addAttributeF("value", "%d", this->value);
-        w.addAttribute("style", "width: 330px");
+        w.addAttribute("style", "width: 430px");
         w.addAttributeF("id", "%s_%s", inPage->id, this->id);
         w.addAttributeF("onchange", "sliderInput(this,'%s', '%s')", inPage->id, this->id);
         w.addAttributeF("oninput", "sliderInput(this,'%s','%s')", inPage->id, this->id);
@@ -190,6 +209,13 @@ public:
         {
             return false;
         }
+    }
+
+    void renderStatusey(OmXmlWriter &w) override
+    {
+        w.addAttribute("kind", "slider");
+        w.addAttribute("min", this->min);
+        w.addAttribute("max", this->max);
     }
 };
 
@@ -253,6 +279,11 @@ public:
             return false;
         }
     }
+
+    void renderStatusey(OmXmlWriter &w) override
+    {
+        w.addAttribute("kind", "time");
+    }
 };
 
 /// Show a visual time input, which call back on changes
@@ -304,10 +335,10 @@ class PageSelect : public PageItem
 {
 public:
     OmWebActionProc proc = 0;
-    std::vector<String> optionNames;
+    std::vector<const char*> optionNames;
     std::vector<int> optionNumbers;
 
-    void addOption(String optionName, int optionNumber)
+    void addOption(const char *optionName, int optionNumber)
     {
         this->optionNames.push_back(optionName);
         this->optionNumbers.push_back(optionNumber);
@@ -339,7 +370,7 @@ public:
                 w.addAttribute("selected", "selected");
                 foundSelectedOption = true;
             }
-            w.addContent(this->optionNames[ix].c_str());
+            w.addContent(this->optionNames[ix]);
             w.endElement();
         }
 
@@ -458,6 +489,18 @@ public:
             return false;
         }
     }
+
+    void renderStatusey(OmXmlWriter &w) override
+    {
+        w.addAttribute("kind", "checkboxes");
+        String s = "";
+        for(auto cn : this->checkboxNames)
+        {
+            if(s.length()) s += ",";
+            s += cn;
+        }
+        w.addAttribute("checkboxNames", s.c_str());
+    }
 };
 
 class PageColor : public PageItem
@@ -508,6 +551,11 @@ public:
             return false;
         }
     }
+
+    void renderStatusey(OmXmlWriter &w) override
+    {
+        w.addAttribute("kind", "color");
+    }
 };
 
 
@@ -533,7 +581,14 @@ public:
         w.addContentF("%s", this->name);
         w.endElement();
     }
-    
+
+    void renderStatusey(OmXmlWriter &w) override
+    {
+        w.addAttribute("kind", "button");
+        if(!omStringEqual(this->url, "_"))
+            w.addAttribute("url", this->url);
+    }
+
     bool doAction(Page *fromPage) override
     {
         if(this->proc)
@@ -564,6 +619,27 @@ public:
     {
         return true;
     }
+
+    void renderStatusey(OmXmlWriter &w) override
+    {
+        w.addAttribute("kind", "html");
+    }
+};
+
+class StaticHtmlItem : public PageItem
+{
+public:
+    String staticHtml;
+
+    void render(OmXmlWriter &w, Page *inPage) override
+    {
+        UNUSED(inPage);
+        w.addRawContent(this->staticHtml.c_str());
+    }
+    void renderStatusey(OmXmlWriter &w) override
+    {
+        w.addAttribute("kind", "htmlStatic");
+    }
 };
 
 void infoHtmlProc(OmXmlWriter &w, int ref1, void *ref2)
@@ -589,6 +665,7 @@ OmWebPages::OmWebPages()
 {
     this->__date__ = __DATE__;
     this->__time__ = __TIME__;
+    this->__file__ = NULL;
     // create the built-in pages
     this->beginPage("_info");
     this->addHtml(infoHtmlProc, 0, this);
@@ -603,14 +680,56 @@ OmWebPages::OmWebPages()
     this->addUrlHandler("_status", statusXmlProc, 0, this);
 }
 
-void OmWebPages::setBuildDateAndTime(const char *date, const char *time)
+OmWebPages::~OmWebPages()
+{
+    for(Page *page : this->pages)
+    {
+        if(page)
+            delete page;
+    }
+    this->pages.clear();
+    
+    for(UrlHandler *handler : this->urlHandlers)
+    {
+        delete handler;
+    }
+    this->urlHandlers.clear();
+}
+
+void OmWebPages::setBuildDateAndTime(const char *date, const char *time, const char *file)
 {
     this->__date__ = date;
     this->__time__ = time;
+    this->__file__ = file;
+
+    if(this->__file__)
+    {
+        // point past last slash
+        const char *w = this->__file__;
+        while(*w != 0)
+        {
+            if(*w == '/')
+                this->__file__ = w + 1;
+            w++;
+        }
+    }
 }
 
 void OmWebPages::beginPage(const char *pageName)
 {
+    // if a page with this name already exists, clear out its contents so
+    // you can replace them with new elements.
+    for(Page *aPage : this->pages)
+    {
+        if(omStringEqual(pageName, aPage->name))
+        {
+            aPage->clearPage();
+            this->currentPage = aPage;
+            return;
+        }
+    }
+
+    // It is indeed a brand new page. Let's create it.
     Page *page = new Page();
     page->name = pageName;
     sprintf(page->id, "p%d", (int)this->pages.size());
@@ -681,7 +800,6 @@ OmWebPageItem *OmWebPages::addButtonWithLink(const char *buttonName, const char 
     b->url = url;
     return item;
 }
-
 
 OmWebPageItem *OmWebPages::addSlider(const char *itemName, OmWebActionProc proc, int value, int ref1, void *ref2)
 {
@@ -829,9 +947,50 @@ void OmWebPages::renderStatusXml(OmXmlWriter &w)
     }
 #endif
     w.addAttributeF("built", "%s %s", this->__date__, this->__time__);
+    if(this->__file__)
+        w.addAttributeF("file", "%s", this->__file__);
 
-    w.endElement();
-    w.endElement();
+    w.endElement("status");
+
+    for(auto page : this->pages)
+    {
+        w.beginElement("page");
+        w.addAttribute("name", page->name);
+        w.addAttribute("id", page->id);
+        w.addAttribute("k", page->items.size());
+        w.endElement("page");
+    }
+
+    for (auto urlHandler : this->urlHandlers)
+    {
+        w.beginElement("urlHandler");
+        w.addAttribute("url", urlHandler->url);
+        w.addAttribute("ref1", urlHandler->ref1);
+        w.addAttributeF("ref2", "0x%08x", urlHandler->ref2);
+        w.addAttributeF("proc", "0x%08x", urlHandler->handlerProc);
+        w.endElement("urlHandler");
+    }
+
+    for(auto page : this->pages)
+        for(auto pageItem : page->items)
+        {
+            w.beginElement("item");
+            w.addAttributeF("ctl", "http://%s:%d/_control?page=%s&item=%s&value=xxx",
+                            omIpToString(ri->serverIp),
+                            ri->serverPort,
+                            page->id,
+                            pageItem->id);
+            w.addAttribute("name", pageItem->name);
+            w.addAttribute("id", pageItem->id);
+            w.addAttribute("pageId", page->id);
+            w.addAttribute("value", pageItem->value);
+            w.addAttribute("ref1", pageItem->ref1);
+            w.addAttributeF("ref2", "0x%08x", pageItem->ref2);
+            pageItem->renderStatusey(w);
+            w.endElement("item");
+        }
+
+    w.endElement("xml");
 }
 
 void OmWebPages::renderInfo(OmXmlWriter &w)
@@ -862,8 +1021,18 @@ void OmWebPages::renderInfo(OmXmlWriter &w)
     w.addContentF("systemSdk:   %s/%d\n", system_get_sdk_version(), system_get_boot_version());
 #endif
 #ifdef ARDUINO_ARCH_ESP32
-    w.addContentF("freeBytes:   %d\n", esp_get_free_heap_size());
-    w.addContentF("chipId:      '32 @%d\n", F_CPU / 1000000);
+    // ESP32 has 3 kinds of memory: 32bit (used for heap), 8bit (also used for DMA), and PSRAM
+    // For the first 2, we show the total amount available, and the largest block available
+    w.addContentF("32-bit Mem:  %d\n", heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
+    w.addContentF("32-bit Block:%d\n", heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
+    w.addContentF("8b/DMA Mem:  %d\n", heap_caps_get_free_size(MALLOC_CAP_DMA));
+    w.addContentF("8b/DMA Block:%d\n", heap_caps_get_largest_free_block(MALLOC_CAP_DMA));
+#ifdef BOARD_HAS_PSRAM
+    // https://thingpulse.com/esp32-how-to-use-psram/
+    w.addContentF("PSRAM used:  %d\n", ESP.getPsramSize() - ESP.getFreePsram());
+    w.addContentF("PSRAM free:  %d\n", ESP.getFreePsram());
+#endif
+    w.addContentF("chipId:      ESP32 @%d\n", F_CPU / 1000000);
 #endif
 #ifdef NOT_ARDUINO
     w.addContentF("what:        Not Arduino\n");
@@ -896,7 +1065,9 @@ void OmWebPages::renderInfo(OmXmlWriter &w)
             w.addContentF(    "wifiNetwork: %s\n", ri->ssid);
     }
 #endif
-    w.addContentF("built:     %s %s\n", this->__date__, this->__time__);
+    w.addContentF("built:       %s %s\n", this->__date__, this->__time__);
+    if(this->__file__)
+        w.addContentF(" file:       %s\n", this->__file__);
 
     w.endElement();
 }
@@ -946,7 +1117,7 @@ void OmWebPages::renderStyle(OmXmlWriter &w, int bgColor)
                  )JS"
     );
 
-    w.addContentF(".box1,.box2,.button{font-size:30px; width:420px ; margin:10px; "
+    w.addContentF(".box1,.box2,.button{font-size:30px; width:540px ; margin:10px; "
                  "padding:10px ; background:%s;"
                  "border-top-left-radius:15px;"
                  "border-bottom-right-radius:15px;"
@@ -955,7 +1126,7 @@ void OmWebPages::renderStyle(OmXmlWriter &w, int bgColor)
                  , colorItem
                  );
     // Not sure why I need to add more width to the button, to make it match
-    w.addContent(".button{border:2px solid black;width:440px;display:block}\n");
+    w.addContent(".button{border:2px solid black;width:560px;display:block}\n");
     w.addContent(".box2{display:inline-block;"
                  "font-size:22px; padding:7px;"
                  "width:auto;overflow:hidden ; "
